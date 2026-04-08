@@ -143,6 +143,49 @@
     .ld-fill  { height: 100%; width: 0; background: linear-gradient(90deg, #1a50b0, #5aa0ff); animation: ld 1.4s cubic-bezier(.4,0,.2,1) forwards; }
     @keyframes ld { to { width: 100%; } }
 
+    /* ── Free-space side labels ── */
+    .space-label {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34%;
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #space-left  { left: 0; }
+    #space-right { right: 0; }
+
+    .sl-main {
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(170, 205, 255, 0.22);
+      margin-bottom: 5px;
+    }
+    .sl-sub {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: rgba(150, 185, 255, 0.14);
+    }
+
+    /* ── Higgs Field bottom label ── */
+    #field-name {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: rgba(160, 195, 255, 0.30);
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
     /* ── Pause overlay ── */
     #pause-badge {
       position: fixed;
@@ -168,11 +211,22 @@
 
 <div id="pause-badge">PAUSED</div>
 
+<!-- Free-space labels -->
+<div class="space-label" id="space-left">
+  <div class="sl-sub">Particles move freely here</div>
+</div>
+<div class="space-label" id="space-right">
+  <div class="sl-sub">Particles move freely here</div>
+</div>
+
+<!-- Higgs Field bottom label -->
+<div id="field-name">Higgs Field</div>
+
 <!-- Monitor (top-left) -->
 <div class="panel" id="monitor">
   <div class="panel-title">Field Monitor</div>
   <div class="stat"><span class="s-lbl">Particles</span><span class="s-val" id="s-p">6</span></div>
-  <div class="stat"><span class="s-lbl">Higgs Bosons</span><span class="s-val" id="s-b">0</span></div>
+
   <div class="stat"><span class="s-lbl">In-Field</span><span class="s-val" id="s-f">0</span></div>
 </div>
 
@@ -221,8 +275,8 @@ renderer.setClearColor(0x000814, 1);
 document.body.appendChild(renderer.domElement);
 
 // Field boundaries — central 40 % of world width
-const FIELD_L = -HALF_W * 0.22;
-const FIELD_R =  HALF_W * 0.22;
+const FIELD_L = -HALF_W * 0.30;
+const FIELD_R =  HALF_W * 0.30;
 
 // ═══════════════════════════════════════════════
 //  GLOW TEXTURE FACTORY
@@ -553,7 +607,7 @@ class Particle {
 
   _sync() {
     const mT       = Math.min(1, (this.mass - 1) / 4.5);
-    const coreSize = 6   + this.mass * 2.5;
+    const coreSize = 5   + this.mass * 5.0;
     const glowSize = 22  + this.mass * 18;
     const auraSize = 44  + this.mass * 42;
 
@@ -643,7 +697,7 @@ let paused    = false;
 let frame     = 0;
 
 function addParticle(wx, wy) {
-  if (particles.length >= 25) return;
+  if (particles.length >= 550) return;
   particles.push(new Particle(wx, wy));
 }
 
@@ -665,12 +719,10 @@ reset();
 // ═══════════════════════════════════════════════
 
 const elP = document.getElementById('s-p');
-const elB = document.getElementById('s-b');
 const elF = document.getElementById('s-f');
 
 function updateUI() {
   elP.textContent = particles.length;
-  elB.textContent = bosons.length;
   elF.textContent = particles.filter(p => p.inField).length;
 }
 
