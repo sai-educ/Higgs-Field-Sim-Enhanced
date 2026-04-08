@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Higgs Field Simulation — Enhanced</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: #c8e4ff;
+    }
+
+    /* ── Glassmorphism panel base ── */
+    .panel {
+      position: fixed;
+      background: rgba(2, 8, 28, 0.84);
+      border: 1px solid rgba(70, 140, 255, 0.16);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 20;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .panel-title {
+      font-size: 9.5px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #4a9eff;
+      margin-bottom: 11px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid rgba(70, 140, 255, 0.14);
+    }
+
+    /* ── Monitor (top-left) ── */
+    #monitor { top: 18px; left: 18px; width: 216px; }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .s-lbl { color: rgba(150, 195, 255, 0.48); }
+    .s-val { color: #7ec8ff; font-weight: bold; }
+    .sep { height: 1px; background: rgba(70, 140, 255, 0.1); margin: 9px 0; }
+
+    /* ── Physics (top-right) ── */
+    #physics { top: 18px; right: 18px; width: 250px; }
+
+    .eq {
+      font-size: 11px;
+      color: #58b0ff;
+      background: rgba(0, 28, 72, 0.48);
+      border-left: 2px solid rgba(58, 128, 255, 0.5);
+      padding: 6px 10px;
+      margin: 7px 0;
+      border-radius: 0 4px 4px 0;
+      letter-spacing: 0.3px;
+    }
+    .desc {
+      font-size: 10.5px;
+      color: rgba(155, 200, 255, 0.56);
+      line-height: 1.65;
+      margin: 4px 0;
+    }
+
+    /* ── Legend (bottom-left) ── */
+    #legend { bottom: 18px; left: 18px; width: 216px; }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(175, 210, 255, 0.68);
+      margin-bottom: 8px;
+      gap: 10px;
+    }
+    .leg:last-child { margin-bottom: 0; }
+
+    .swatch {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Controls (bottom-right) ── */
+    #controls { bottom: 18px; right: 18px; }
+
+    .ctrl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: rgba(155, 200, 255, 0.58);
+      margin-bottom: 7px;
+    }
+    .ctrl:last-child { margin-bottom: 0; }
+
+    kbd {
+      background: rgba(55, 115, 255, 0.1);
+      border: 1px solid rgba(55, 115, 255, 0.24);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 10.5px;
+      color: #58a0ff;
+      font-family: inherit;
+    }
+
+    /* ── Mexican Hat Potential (bottom-center) ── */
+    #potential {
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 192px;
+      text-align: center;
+    }
+    #pot-canvas { display: block; margin: 0 auto; }
+
+    /* ── Loading ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000814;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 100;
+      transition: opacity 0.85s ease;
+    }
+    .ld-title { font-size: 11px; letter-spacing: 6px; color: #4a9eff; text-transform: uppercase; }
+    .ld-sub   { font-size: 9px;  letter-spacing: 3px; color: rgba(80, 160, 255, 0.38); }
+    .ld-bar   { width: 150px; height: 1px; background: rgba(55, 115, 255, 0.14); border-radius: 1px; overflow: hidden; }
+    .ld-fill  { height: 100%; width: 0; background: linear-gradient(90deg, #1a50b0, #5aa0ff); animation: ld 1.4s cubic-bezier(.4,0,.2,1) forwards; }
+    @keyframes ld { to { width: 100%; } }
+
+    /* ── Pause overlay ── */
+    #pause-badge {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: rgba(75, 155, 255, 0.45);
+      z-index: 15;
+      display: none;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="ld-title">Higgs Field</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-sub">Initializing quantum vacuum…</div>
+</div>
+
+<div id="pause-badge">PAUSED</div>
+
+<!-- Monitor (top-left) -->
+<div class="panel" id="monitor">
+  <div class="panel-title">Field Monitor</div>
+  <div class="stat"><span class="s-lbl">Particles</span><span class="s-val" id="s-p">6</span></div>
+  <div class="stat"><span class="s-lbl">Higgs Bosons</span><span class="s-val" id="s-b">0</span></div>
+  <div class="stat"><span class="s-lbl">In-Field</span><span class="s-val" id="s-f">0</span></div>
+</div>
+
+
+<!-- Legend (bottom-left) -->
+<div class="panel" id="legend">
+  <div class="panel-title">Legend</div>
+  <div class="leg">
+    <div class="swatch" style="background:#ffd040;box-shadow:0 0 5px #ffa000;"></div>
+    <span>Massless particle (outside field)</span>
+  </div>
+  <div class="leg">
+    <div class="swatch" style="background:#ff5c18;box-shadow:0 0 5px #ff2800;"></div>
+    <span>Massive particle (in Higgs field)</span>
+  </div>
+</div>
+
+<!-- Controls (bottom-right) -->
+<div class="panel" id="controls">
+  <div class="panel-title">Controls</div>
+  <div class="ctrl"><kbd>Click</kbd><span>Add particle</span></div>
+  <div class="ctrl"><kbd>Space</kbd><span>Pause / Resume</span></div>
+  <div class="ctrl"><kbd>R</kbd><span>Reset</span></div>
+</div>
+
+
+<!-- Three.js -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════
+//  SCENE
+// ═══════════════════════════════════════════════
+
+const HALF_H = 400;
+const HALF_W = HALF_H * (window.innerWidth / window.innerHeight);
+
+const scene    = new THREE.Scene();
+const camera   = new THREE.OrthographicCamera(-HALF_W, HALF_W, HALF_H, -HALF_H, -10, 10);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000814, 1);
+document.body.appendChild(renderer.domElement);
+
+// Field boundaries — central 40 % of world width
+const FIELD_L = -HALF_W * 0.22;
+const FIELD_R =  HALF_W * 0.22;
+
+// ═══════════════════════════════════════════════
+//  GLOW TEXTURE FACTORY
+// ═══════════════════════════════════════════════
+
+function glowTex(r, g, b, size, falloff) {
+  const cv  = document.createElement('canvas');
+  cv.width  = size;
+  cv.height = size;
+  const ctx = cv.getContext('2d');
+  const c   = size * 0.5;
+  const gr  = ctx.createRadialGradient(c, c, 0, c, c, c);
+  gr.addColorStop(0,            `rgba(${r},${g},${b},1)`);
+  gr.addColorStop(falloff,      `rgba(${r},${g},${b},0.75)`);
+  gr.addColorStop(falloff * 2.6,`rgba(${r},${g},${b},0.2)`);
+  gr.addColorStop(1,            `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(cv);
+}
+
+const TX = {
+  white:  glowTex(255, 255, 255,  64, 0.10),
+  yellow: glowTex(255, 215,  40, 256, 0.16),
+  orange: glowTex(255,  88,  12, 256, 0.16),
+  boson:  glowTex( 50, 195, 255,  64, 0.18),
+  vacuum: glowTex( 70, 100, 255,  32, 0.28),
+};
+
+// ═══════════════════════════════════════════════
+//  BACKGROUND STARS
+// ═══════════════════════════════════════════════
+
+(function buildStars() {
+  const N   = 320;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3]     = (Math.random() - 0.5) * HALF_W * 2.2;
+    pos[i * 3 + 1] = (Math.random() - 0.5) * HALF_H * 2.2;
+    pos[i * 3 + 2] = -4;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x4868a8, size: 1, transparent: true, opacity: 0.32,
+    sizeAttenuation: false,
+    blending: THREE.AdditiveBlending,
+  });
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+// ═══════════════════════════════════════════════
+//  FIELD AMBIENT GLOW (central strip)
+// ═══════════════════════════════════════════════
+
+let fieldAmbient;
+
+(function buildFieldAmbient() {
+  const cv  = document.createElement('canvas');
+  cv.width  = 128; cv.height = 1;
+  const ctx = cv.getContext('2d');
+  const gr  = ctx.createLinearGradient(0, 0, 128, 0);
+  gr.addColorStop(0,   'rgba(35,18,190,0)');
+  gr.addColorStop(0.1, 'rgba(35,18,190,0.06)');
+  gr.addColorStop(0.5, 'rgba(50,28,245,0.12)');
+  gr.addColorStop(0.9, 'rgba(35,18,190,0.06)');
+  gr.addColorStop(1,   'rgba(35,18,190,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, 128, 1);
+  const tex = new THREE.CanvasTexture(cv);
+
+  const fw  = (FIELD_R - FIELD_L) * 1.65;
+  const fh  = HALF_H * 2;
+  const geo = new THREE.PlaneGeometry(fw, fh);
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  fieldAmbient = new THREE.Mesh(geo, mat);
+  fieldAmbient.position.z = -3;
+  scene.add(fieldAmbient);
+})();
+
+function pulseAmbient(t) {
+  fieldAmbient.material.opacity = 0.65 + 0.35 * Math.sin(t * 0.038);
+}
+
+// ═══════════════════════════════════════════════
+//  FIELD BOUNDARY LINES
+// ═══════════════════════════════════════════════
+
+function makeBoundary(x) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(
+    new Float32Array([x, -HALF_H, -1, x, HALF_H, -1]), 3));
+  const mat = new THREE.LineBasicMaterial({
+    color: 0x223480, transparent: true, opacity: 0.42,
+    blending: THREE.AdditiveBlending,
+  });
+  return new THREE.Line(geo, mat);
+}
+scene.add(makeBoundary(FIELD_L));
+scene.add(makeBoundary(FIELD_R));
+
+// ═══════════════════════════════════════════════
+//  WAVE LINES
+// ═══════════════════════════════════════════════
+
+const N_LINES = 30;
+const N_PTS   = 80;
+const waveLines = [];
+
+for (let i = 0; i < N_LINES; i++) {
+  const yBase = -HALF_H + (i / (N_LINES - 1)) * HALF_H * 2;
+  const pos   = new Float32Array(N_PTS * 3);
+  const col   = new Float32Array(N_PTS * 3);
+
+  for (let j = 0; j < N_PTS; j++) {
+    pos[j * 3]     = -HALF_W + (j / (N_PTS - 1)) * HALF_W * 2;
+    pos[j * 3 + 1] = yBase;
+    pos[j * 3 + 2] = -1;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+
+  const line = new THREE.Line(geo, mat);
+  scene.add(line);
+  waveLines.push({ line, yBase });
+}
+
+function updateWaveLines(t) {
+  for (let i = 0; i < N_LINES; i++) {
+    const { line, yBase } = waveLines[i];
+    const pos = line.geometry.attributes.position;
+    const col = line.geometry.attributes.color;
+
+    for (let j = 0; j < N_PTS; j++) {
+      const x    = pos.getX(j);
+      const inF  = x > FIELD_L && x < FIELD_R;
+
+      // Edge smooth-fade just outside the field
+      let str = 0.11;
+      if (inF) {
+        str = 1.0;
+      } else {
+        const d = Math.min(Math.abs(x - FIELD_L), Math.abs(x - FIELD_R));
+        str = 0.11 + 0.89 * Math.max(0, 1 - d / (HALF_W * 0.10)) * (inF ? 1 : 0);
+        str = 0.11; // outside: dim
+      }
+
+      const amp  = 15 * (inF ? 1.0 : 1.0);
+      const wave =
+        Math.sin(t * 0.036 + i * 0.44 + j * 0.19) * amp * (inF ? 1.0 : 0.11)
+      + Math.sin(t * 0.021 + i * 0.72 - j * 0.12) * amp * 0.38 * (inF ? 1.0 : 0.11);
+
+      pos.setY(j, yBase + wave);
+
+      if (inF) {
+        const g = 0.5 + 0.5 * Math.sin(t * 0.048 + i * 0.31 + j * 0.05);
+        col.setXYZ(j, 0.15 * g, 0.10 * g, g * 0.92);
+      } else {
+        col.setXYZ(j, 0.04, 0.06, 0.16);
+      }
+    }
+
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  VACUUM FLUCTUATIONS
+// ═══════════════════════════════════════════════
+
+const N_VAC    = 210;
+const vacPos   = new Float32Array(N_VAC * 3);
+const vacCol   = new Float32Array(N_VAC * 3);
+const vacPhase = new Float32Array(N_VAC);
+const vacRate  = new Float32Array(N_VAC);
+
+for (let i = 0; i < N_VAC; i++) {
+  vacPos[i * 3]     = FIELD_L + Math.random() * (FIELD_R - FIELD_L);
+  vacPos[i * 3 + 1] = -HALF_H + Math.random() * HALF_H * 2;
+  vacPos[i * 3 + 2] = 0;
+  vacPhase[i]        = Math.random() * Math.PI * 2;
+  vacRate[i]         = 0.025 + Math.random() * 0.055;
+}
+
+const vacGeo = new THREE.BufferGeometry();
+vacGeo.setAttribute('position', new THREE.BufferAttribute(vacPos, 3));
+vacGeo.setAttribute('color',    new THREE.BufferAttribute(vacCol, 3));
+
+const vacMat = new THREE.PointsMaterial({
+  size: 2.2, vertexColors: true, transparent: true,
+  sizeAttenuation: false,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+scene.add(new THREE.Points(vacGeo, vacMat));
+
+function updateVacuum(t) {
+  const col = vacGeo.attributes.color;
+  for (let i = 0; i < N_VAC; i++) {
+    const brt = 0.5 + 0.5 * Math.sin(t * vacRate[i] + vacPhase[i]);
+    const b   = brt * 0.22;
+    col.setXYZ(i, b * 0.28, b * 0.38, b);
+  }
+  col.needsUpdate = true;
+}
+
+// ═══════════════════════════════════════════════
+//  PARTICLE
+// ═══════════════════════════════════════════════
+
+class Particle {
+  constructor(wx, wy) {
+    this.x  = wx;
+    this.y  = wy;
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.2 + Math.random() * 1.2;
+    this.vx = Math.cos(a) * s;
+    this.vy = Math.sin(a) * s;
+
+    this.mass     = 1;
+    this.baseMass = 1;
+    this.yukawa   = 0.25 + Math.random() * 0.75; // coupling constant
+    this.inField  = false;
+
+    // Trail
+    this.trail    = [];
+    this.MAX_T    = 24;
+
+    // Three sprite layers: aura → glow → core
+    this.aura = this._sprite(TX.yellow, 0, 0.28);
+    this.glow = this._sprite(TX.yellow, 1, 0.62);
+    this.core = this._sprite(TX.white,  2, 1.00);
+
+    // Trail line
+    const tGeo = new THREE.BufferGeometry();
+    const tPos = new Float32Array(this.MAX_T * 3);
+    const tCol = new Float32Array(this.MAX_T * 3);
+    tGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+    tGeo.setAttribute('color',    new THREE.BufferAttribute(tCol, 3));
+    tGeo.setDrawRange(0, 0);
+    this.trailLine = new THREE.Line(tGeo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    scene.add(this.trailLine);
+    this._sync();
+  }
+
+  _sprite(tex, z, opacity) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity,
+    }));
+    sp.position.z = z;
+    scene.add(sp);
+    return sp;
+  }
+
+  _inField() { return this.x > FIELD_L && this.x < FIELD_R; }
+
+  update() {
+    this.inField = this._inField();
+
+    if (this.inField) {
+      // Viscous drag → particle slows → gains effective inertial mass
+      this.vx *= 0.984;
+      this.vy *= 0.984;
+      // Yukawa mass acquisition
+      const mTarget = 1 + this.yukawa * 4.5;
+      this.mass += (mTarget - this.mass) * 0.014;
+      // Quantum vacuum jitter
+      this.vx += (Math.random() - 0.5) * 0.18;
+      this.vy += (Math.random() - 0.5) * 0.18;
+      // Higgs boson emission (stochastic)
+      if (Math.random() < 0.022) bosons.push(new HiggsBoson(this.x, this.y));
+    } else {
+      this.mass += (this.baseMass - this.mass) * 0.07;
+      const spd = Math.hypot(this.vx, this.vy);
+      if (spd > 3.2) { this.vx *= 3.2 / spd; this.vy *= 3.2 / spd; }
+    }
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Wall bounce
+    if (this.x < -HALF_W) { this.x = -HALF_W; this.vx =  Math.abs(this.vx); }
+    if (this.x >  HALF_W) { this.x =  HALF_W; this.vx = -Math.abs(this.vx); }
+    if (this.y < -HALF_H) { this.y = -HALF_H; this.vy =  Math.abs(this.vy); }
+    if (this.y >  HALF_H) { this.y =  HALF_H; this.vy = -Math.abs(this.vy); }
+
+    this._updateTrail();
+    this._sync();
+  }
+
+  _updateTrail() {
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > this.MAX_T) this.trail.shift();
+
+    const geo = this.trailLine.geometry;
+    const pos = geo.attributes.position;
+    const col = geo.attributes.color;
+    const n   = this.trail.length;
+    const mT  = Math.min(1, (this.mass - 1) / 4.5);
+    const R   = 1;
+    const G   = 0.82 - mT * 0.66;
+    const B   = 0.14;
+
+    for (let i = 0; i < n; i++) {
+      const t  = i / (n - 1 || 1);
+      const br = t * 0.32;
+      pos.setXYZ(i, this.trail[i].x, this.trail[i].y, 0.5);
+      col.setXYZ(i, R * br, G * br, B * br);
+    }
+    geo.setDrawRange(0, n);
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+  }
+
+  _sync() {
+    const mT       = Math.min(1, (this.mass - 1) / 4.5);
+    const coreSize = 6   + this.mass * 2.5;
+    const glowSize = 22  + this.mass * 18;
+    const auraSize = 44  + this.mass * 42;
+
+    const R = 1;
+    const G = 0.86 - mT * 0.72;
+    const B = 0.14 - mT * 0.10;
+
+    for (const sp of [this.aura, this.glow, this.core]) {
+      sp.position.x = this.x;
+      sp.position.y = this.y;
+    }
+    this.core.scale.setScalar(coreSize);
+    this.glow.scale.setScalar(glowSize);
+    this.aura.scale.setScalar(auraSize);
+
+    this.core.material.color.setRGB(R, G, B);
+    this.glow.material.color.setRGB(R, G * 0.78, B);
+    this.aura.material.color.setRGB(R, G * 0.48, B);
+
+    const newTex = mT > 0.22 ? TX.orange : TX.yellow;
+    if (this.glow.material.map !== newTex) {
+      this.glow.material.map = newTex;
+      this.aura.material.map = newTex;
+      this.glow.material.needsUpdate = true;
+      this.aura.material.needsUpdate = true;
+    }
+  }
+
+  dispose() {
+    for (const sp of [this.aura, this.glow, this.core]) scene.remove(sp);
+    scene.remove(this.trailLine);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  HIGGS BOSON
+// ═══════════════════════════════════════════════
+
+class HiggsBoson {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.0 + Math.random() * 2.5;
+    this.vx    = Math.cos(a) * s;
+    this.vy    = Math.sin(a) * s;
+    this.life  = 1.0;
+    this.decay = 0.024 + Math.random() * 0.026;
+
+    const sz = 7 + Math.random() * 11;
+    this.sp  = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: TX.boson, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      opacity: 1.0,
+      color: new THREE.Color(0.22, 0.80, 1.0),
+    }));
+    this.sp.scale.setScalar(sz);
+    this.sp.position.z = 3;
+    scene.add(this.sp);
+    this._sync();
+  }
+
+  update() {
+    this.x    += this.vx;
+    this.y    += this.vy;
+    this.vx   *= 0.968;
+    this.vy   *= 0.968;
+    this.life -= this.decay;
+    this._sync();
+  }
+
+  _sync() {
+    this.sp.position.set(this.x, this.y, 3);
+    this.sp.material.opacity = Math.pow(Math.max(0, this.life), 1.5);
+  }
+
+  isDead()  { return this.life <= 0; }
+  dispose() { scene.remove(this.sp); }
+}
+
+// ═══════════════════════════════════════════════
+//  SIMULATION STATE
+// ═══════════════════════════════════════════════
+
+let particles = [];
+let bosons    = [];
+let paused    = false;
+let frame     = 0;
+
+function addParticle(wx, wy) {
+  if (particles.length >= 25) return;
+  particles.push(new Particle(wx, wy));
+}
+
+function reset() {
+  particles.forEach(p => p.dispose());
+  bosons.forEach(b => b.dispose());
+  particles = []; bosons = [];
+  for (let i = 0; i < 6; i++) {
+    addParticle(
+      (Math.random() - 0.5) * HALF_W * 1.65,
+      (Math.random() - 0.5) * HALF_H * 1.65,
+    );
+  }
+}
+reset();
+
+// ═══════════════════════════════════════════════
+//  UI
+// ═══════════════════════════════════════════════
+
+const elP = document.getElementById('s-p');
+const elB = document.getElementById('s-b');
+const elF = document.getElementById('s-f');
+
+function updateUI() {
+  elP.textContent = particles.length;
+  elB.textContent = bosons.length;
+  elF.textContent = particles.filter(p => p.inField).length;
+}
+
+
+// ═══════════════════════════════════════════════
+//  ANIMATION LOOP
+// ═══════════════════════════════════════════════
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (paused) return;
+  frame++;
+
+  pulseAmbient(frame);
+  updateWaveLines(frame);
+  updateVacuum(frame);
+
+  for (const p of particles) p.update();
+
+  for (let i = bosons.length - 1; i >= 0; i--) {
+    bosons[i].update();
+    if (bosons[i].isDead()) { bosons[i].dispose(); bosons.splice(i, 1); }
+  }
+
+  if (frame % 4 === 0) updateUI();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ═══════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════
+
+renderer.domElement.addEventListener('click', e => {
+  const r  = renderer.domElement.getBoundingClientRect();
+  const nx = (e.clientX - r.left) / r.width;
+  const ny = (e.clientY - r.top)  / r.height;
+  addParticle((nx - 0.5) * HALF_W * 2, -(ny - 0.5) * HALF_H * 2);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    paused = !paused;
+    document.getElementById('pause-badge').style.display = paused ? 'block' : 'none';
+  }
+  if (e.code === 'KeyR') reset();
+});
+
+// ═══════════════════════════════════════════════
+//  RESIZE
+// ═══════════════════════════════════════════════
+
+window.addEventListener('resize', () => {
+  const nW    = window.innerWidth;
+  const nH    = window.innerHeight;
+  const nHalf = HALF_H * (nW / nH);
+  camera.left  = -nHalf;
+  camera.right =  nHalf;
+  camera.updateProjectionMatrix();
+  renderer.setSize(nW, nH);
+});
+
+// ═══════════════════════════════════════════════
+//  LOADING FADE-OUT
+// ═══════════════════════════════════════════════
+
+setTimeout(() => {
+  const ld = document.getElementById('loading');
+  ld.style.opacity = '0';
+  setTimeout(() => ld.remove(), 900);
+}, 1500);
+</script>
+</body>
+</html>
